@@ -59,6 +59,7 @@
 #define MAX_PLAYERS         12
 
 #define FSYS_FILENAME_MAX   255 // FIXME inherited from dingoo
+#define OS_TICKS_PER_SEC    1000
 
 typedef char bool_t;
 
@@ -96,10 +97,7 @@ typedef struct
 
 /* Game related */
 extern uint32_t     gameTimer;      /* Game timer (automatic shift down of figure) */
-extern uint32_t     gameTickRate;   /* 30 FPS */
 extern bool_t       gameRunning;    /* TRUE: game is running, FALSE: game shall exit! */
-extern int          sysref;
-extern int          ref;
 extern main_state_machine_t main_state_machine; /* Game state machine. @see handleMainStateMachine */
 
 /* Random related */
@@ -121,6 +119,7 @@ uint8_t myrand (void);
 bool_t saveConfig (void);
 char* getNextMusicFile (bool_t *aTurnOver);
 char* getPrevMusicFile (bool_t *aTurnOver);
+void key_task();
 
 #endif /* _INCLUDE_COMMON_H_ */
 

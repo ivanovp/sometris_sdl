@@ -13,6 +13,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
 
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
@@ -22,16 +23,27 @@
 #include "game_common.h"
 #include "game_gfx.h"
 
-#define BLOCKS_SPRITE_FILENAME  "stblocks.spt"
+//#define BLOCKS_SPRITE_FILENAME  "stblocks.spt"
 #define CONFIG_FILENAME         "stconfig.bin"
 #define GAME_FILENAME           "stgame.bin"    /**< Saved game */
-#define PLAYLIST_FILENAME       "playlist.txt"  /**< Path of your music collection (MOD/S3M/XM) */
-#define PLAYLIST_MEM_LIMIT      (32768)         /**< 32 KiB */
-#define DEFAULT_MUSIC_FILENAME  "music.mod"
-#define SOUND_FREQ_HZ           44100
-#define SOUND_CHANNELS          1       /* 1: mono, 2: stereo, FIXME stereo decoding not OK! */
-#define OS_DIR_SEP_CHR          '\\'
-#define OS_DIR_SEP_STR          "\\"
+//#define PLAYLIST_FILENAME       "playlist.txt"  /**< Path of your music collection (MOD/S3M/XM) */
+//#define PLAYLIST_MEM_LIMIT      (32768)         /**< 32 KiB */
+//#define DEFAULT_MUSIC_FILENAME  "music.mod"
+//#define SOUND_FREQ_HZ           44100
+//#define SOUND_CHANNELS          1       /* 1: mono, 2: stereo, FIXME stereo decoding not OK! */
+//#define OS_DIR_SEP_CHR          '\\'
+//#define OS_DIR_SEP_STR          "\\"
+
+#define MAX_KEYS                6
+#define KEY_UP                  0
+#define KEY_DOWN                1
+#define KEY_LEFT                2
+#define KEY_RIGHT               3
+#define KEY_ENTER               4
+#define KEY_SPACE               5
+
+#define FAST_REPEAT_TICK        150
+#define NORMAL_REPEAT_TICK      250
 
 typedef struct linkedListElement_tag
 {
@@ -40,6 +52,14 @@ typedef struct linkedListElement_tag
     struct linkedListElement_tag* prev;    /* Previous element, NULL if it is the first one. */
     uint16_t pos;
 } linkedListElement_t;
+
+typedef struct
+{
+  bool_t pressed;
+  bool_t changed;
+  uint32_t pressTick;
+  uint32_t repeatTick;
+} mykey_t;
 
 const char* info[] =
 {
@@ -51,15 +71,16 @@ const char* info[] =
     "redistribute it under certain conditions; see COPYING",
     "for details.",
     "During play you can use these buttons:",
-    "START: Pause game",
-    "SELECT+START: Exit game",
+    "ENTER: Pause game",
+    "ESCAPE: Exit game",
     "Left/right/down: Move",
-    "A: Rotate",
+    "Up: Rotate",
     "Now you can select number of block types with up/down.",
-    "Press 'A' to start game."
+    "Press 'ENTER' to start game."
 };
 
 /* Game related */
+uint32_t     gameTimer = 0;
 bool_t       gameRunning   = TRUE;
 main_state_machine_t main_state_machine = STATE_undefined;
 
@@ -85,6 +106,22 @@ char         musicFileName[16];
 char         musicFilePath[FSYS_FILENAME_MAX];
 bool_t       playEnd = FALSE;
 
+mykey_t      keys[MAX_KEYS] = { 0 };
+
+#define leftPressed   keys[KEY_LEFT].pressed
+#define rightPressed  keys[KEY_RIGHT].pressed
+#define downPressed   keys[KEY_DOWN].pressed
+#define upPressed     keys[KEY_UP].pressed
+#define enterPressed  keys[KEY_ENTER].pressed
+#define spacePressed  keys[KEY_SPACE].pressed
+
+#define leftChanged   keys[KEY_LEFT].changed
+#define rightChanged  keys[KEY_RIGHT].changed
+#define downChanged   keys[KEY_DOWN].changed
+#define upChanged     keys[KEY_UP].changed
+#define enterChanged  keys[KEY_ENTER].changed
+#define spaceChanged  keys[KEY_SPACE].changed
+
 /* Default configuration, could be overwritten by loadConfig() */
 config_t config =
 {
@@ -96,7 +133,9 @@ config_t config =
     .music_file_path = { 0 }
 };
 
-SDL_Event event;
+// The images
+SDL_Surface* background = NULL;
+SDL_Surface* screen = NULL;
 
 /**
  * Set up default configuration and load if configuration file exists.
@@ -680,6 +719,7 @@ void donePlaylist (void)
         playlist_mem_size = 0;
     }
 }
+#endif
 
 /**
  * @brief init
@@ -689,12 +729,80 @@ void donePlaylist (void)
  */
 bool_t init (void)
 {
-    gfx_texture* blockSpriteBmp;
-    uint16_t i;
-    char tempString[FILENAME_MAX];
-    FILE* spriteFile;
+    int i;
 
-    srand (OSTimeGet());
+    srand(time(NULL));
+
+    SDL_Init(SDL_INIT_EVERYTHING);
+
+    // Set up screen
+    screen = SDL_SetVideoMode(320, 240, 32, SDL_SWSURFACE);
+
+    // Load background image
+    background = IMG_Load( BACKGROUND_PNG );
+
+    //Apply image to screen
+    SDL_BlitSurface( background, NULL, screen, NULL );
+
+#if 0
+    // Initialize SDL_ttf library
+    if (TTF_Init() != 0)
+    {
+        printf("TTF_Init() Failed: %s\n", TTF_GetError());
+        SDL_Quit();
+        exit(1);
+    }
+
+    // Load a font
+    TTF_Font *font;
+    font = TTF_OpenFont("/usr/share/fonts/TTF/FreeSans.ttf", 24);
+    if (font == NULL)
+    {
+        printf("TTF_OpenFont() Failed: %s\n", TTF_GetError());
+        TTF_Quit();
+        SDL_Quit();
+        exit(1);
+    }
+
+    // Write text to surface
+    SDL_Surface *text;
+    SDL_Color text_color = {0, 0, 0};
+    text = TTF_RenderText_Solid(font,
+                                "A journey of a thousand miles begins with a single step.",
+                                text_color);
+
+    if (text == NULL)
+    {
+        printf("TTF_RenderText_Solid() Failed: %s\n", TTF_GetError());
+        TTF_Quit();
+        SDL_Quit();
+        exit(1);
+    }
+
+    SDL_Rect rect;
+    rect.x = 10;
+    rect.y = 450;
+    rect.w = text->clip_rect.w;
+    rect.h = text->clip_rect.h;
+
+    // Apply the text to the display
+    if (SDL_BlitSurface(text, NULL, screen, &rect) != 0)
+    {
+        printf("SDL_BlitSurface() Failed: %s\n", SDL_GetError());
+    }
+
+    //Update Screen
+    SDL_Flip( screen );
+#endif
+
+    loadBlocks();
+
+    keys[KEY_UP].repeatTick = NORMAL_REPEAT_TICK;
+    keys[KEY_DOWN].repeatTick = FAST_REPEAT_TICK;
+    keys[KEY_LEFT].repeatTick = FAST_REPEAT_TICK;
+    keys[KEY_RIGHT].repeatTick = FAST_REPEAT_TICK;
+    keys[KEY_ENTER].repeatTick = NORMAL_REPEAT_TICK;
+    keys[KEY_SPACE].repeatTick = NORMAL_REPEAT_TICK;
 
     /* Fill random buffer with the library's values.
      * (Before generating real random values.)
@@ -704,72 +812,12 @@ bool_t init (void)
         key_delta[i] = rand();
     }
 
-    control_init ();
-    gameDisplay = display_create (320, 240, 320, (DISPLAY_FORMAT_RGB565 | DISPLAY_BUFFER_STATIC), NULL, NULL);
-    if (gameDisplay == NULL)
-    {
-        control_term();
-        return FALSE;
-    }
-    gfx_init (gameDisplay);
-
-    control_lock (timer_resolution / 4);
-
-    gameFontSmall = gfx_font_load ("font.tga", COLOR_BLACK);
-    gameFontNormal = gfx_font_load ("font13.tga", COLOR_BLACK);
-
     loadConfig ();
 
-    gfx_render_target_clear (DEFAULT_BG_COLOR);
-
-    spriteFile = fopen (BLOCKS_SPRITE_FILENAME, "rb");
-    if (spriteFile == NULL)
-    {
-        drawInfoScreen ("Generating sprites...");
-
-        bool_t end = FALSE;
-        blockSprite = sprite_load_from_tga ("block0.tga", TRANSPARENT_BG_COLOR);
-        if (blockSprite == NULL)
-        {
-            return FALSE;
-        }
-        for (i = 1; !end; i++)
-        {
-            sprintf (tempString, "block%i.tga", i);
-            blockSpriteBmp = gfx_tex_load_tga (tempString);
-            if (blockSpriteBmp)
-            {
-                blockSprite = sprite_frame_add_bitmap (blockSprite,  blockSpriteBmp->address,
-                                                       TRANSPARENT_BG_COLOR);
-                gfx_tex_delete (blockSpriteBmp);
-            }
-            else
-            {
-                end = TRUE;
-            }
-        }
-        sprite_save (blockSprite, BLOCKS_SPRITE_FILENAME);
-    }
-    else
-    {
-        fclose (spriteFile);
-        blockSprite = sprite_load (BLOCKS_SPRITE_FILENAME);
-    }
-
-    gfxTimer = timer_create();
-
-    /* Virtual keyboard */
-    vrtkey_init (VRTKEY_MODE_WITHTEXTFIELD);
-    //vrtkey_init (VRTKEY_MODE_BASIC);
-    //vrtkey_config (VRTKEY_OPT_ENABLECANCEL, 0);
-    vrtkey_config (VRTKEY_OPT_SHOWTEXTFIELD, 1);
-    
     can_load_game = canLoadGame ();
 
     /* Music (MOD/XM/S3M files) */
-    initPlaylist ();
-    music_initted = audiothread_init (SOUND_FREQ_HZ, SOUND_CHANNELS);
-    audiothread_pause (config.music_paused);
+//    initPlaylist ();
 
     return TRUE;
 }
@@ -780,20 +828,9 @@ void collectRandomNumbers (void)
     static uint32_t prev_key_time = 0;
 
     /* Get time between key presses to get better random numbers */
-    if ((control_check(CONTROL_BUTTON_A).changed)
-            || (control_check(CONTROL_BUTTON_B).changed)
-            || (control_check(CONTROL_BUTTON_X).changed)
-            || (control_check(CONTROL_BUTTON_Y).changed)
-            || (control_check(CONTROL_DPAD_RIGHT).changed)
-            || (control_check(CONTROL_DPAD_LEFT).changed)
-            || (control_check(CONTROL_DPAD_UP).changed)
-            || (control_check(CONTROL_DPAD_DOWN).changed)
-            || (control_check(CONTROL_TRIGGER_LEFT).changed)
-            || (control_check(CONTROL_TRIGGER_RIGHT).changed)
-            || (control_check(CONTROL_BUTTON_SELECT).changed)
-            || (control_check(CONTROL_BUTTON_START).changed))
+    if (upPressed || downPressed || leftPressed || rightPressed)
     {
-        key_time = OSTimeGet ();
+        key_time = SDL_GetTicks();
         key_delta[key_delta_widx & KEY_DELTA_IDX_MASK] = key_time - prev_key_time;
         key_delta_widx++;
         key_delta_widx &= KEY_DELTA_IDX_MASK;
@@ -807,39 +844,31 @@ void collectRandomNumbers (void)
  */
 void handleMovement (void)
 {
-    static uint8_t divider = 0; /* To slow down movement of figure */
-
-    divider++;
-    if (divider == 3)
+    if (rightPressed && rightChanged)
     {
-        divider = 0;
-        if (control_check (CONTROL_DPAD_RIGHT).pressed)
+        /* Right */
+        if (canMoveFigureRight ())
         {
-            /* Right */
-            if (canMoveFigureRight ())
-            {
-                game.figure_x++;
-            }
-        }
-        else if (control_check (CONTROL_DPAD_LEFT).pressed)
-        {
-            /* Left */
-            if (canMoveFigureLeft ())
-            {
-                game.figure_x--;
-            }
-        }
-        if (control_check (CONTROL_DPAD_DOWN).pressed)
-        {
-            /* Down */
-            if (canMoveFigureDown ())
-            {
-                game.figure_y++;
-            }
+            game.figure_x++;
         }
     }
-    if (control_check(CONTROL_BUTTON_A).pressed
-            && control_check(CONTROL_BUTTON_A).changed)
+    else if (leftPressed && leftChanged)
+    {
+        /* Left */
+        if (canMoveFigureLeft ())
+        {
+            game.figure_x--;
+        }
+    }
+    if (downPressed && downChanged)
+    {
+        /* Down */
+        if (canMoveFigureDown ())
+        {
+            game.figure_y++;
+        }
+    }
+    if (upPressed && upChanged)
     {
         uint8_t new_x = 0, new_y = 0;
         /* Rotate */
@@ -849,7 +878,7 @@ void handleMovement (void)
         }
     }
 #ifndef TEST_MOVEMENT
-    if (OSTimeGet() >= gameTimer)
+    if (SDL_GetTicks() >= gameTimer)
     {
         /* Automatic fall */
         int16_t ticks;
@@ -871,11 +900,12 @@ void handleMovement (void)
         {
             ticks = OS_TICKS_PER_SEC / 10;
         }
-        gameTimer = OSTimeGet() + ticks;
+        gameTimer = SDL_GetTicks() + ticks;
     }
 #endif
 }
 
+#if 1
 /**
  * @brief handle_main_state_machine
  * Check inputs and change state machine if it is necessary.
@@ -893,25 +923,23 @@ bool_t handleMainStateMachine (void)
         case STATE_load_game:
             if (can_load_game)
             {
-                if ((control_check (CONTROL_BUTTON_A).pressed)
-                        && (control_check (CONTROL_BUTTON_A).changed))
+                if (enterPressed && enterChanged)
                 {
                     loadGame ();
                     deleteGame ();
                     main_state_machine = STATE_running;
                 }
-                if ((control_check (CONTROL_BUTTON_B).pressed)
-                        && (control_check (CONTROL_BUTTON_B).changed))
+                if (spacePressed && spaceChanged)
                 {
                     deleteGame ();
                     main_state_machine = STATE_difficulty_selection;
                 }
-                gfx_render_target_clear (DEFAULT_BG_COLOR);
+                SDL_BlitSurface( background, NULL, screen, NULL );
                 gfx_font_print_center (TEXT_YN(5), gameFontNormal, "Automatically saved");
                 gfx_font_print_center (TEXT_YN(6), gameFontNormal, "game found!");
-                gfx_font_print_center (TEXT_YN(7), gameFontNormal, "A: Load");
-                gfx_font_print_center (TEXT_YN(8), gameFontNormal, "B: Abandon");
-                display_flip (gameDisplay);
+                gfx_font_print_center (TEXT_YN(7), gameFontNormal, "ENTER: Load");
+                gfx_font_print_center (TEXT_YN(8), gameFontNormal, "SPACE: Abandon");
+                SDL_Flip(screen);
             }
             else
             {
@@ -919,26 +947,21 @@ bool_t handleMainStateMachine (void)
             }
             break;
         case STATE_difficulty_selection:
-            if ((control_check (CONTROL_DPAD_DOWN).pressed)
-                    && (control_check (CONTROL_DPAD_DOWN).changed)
+            if (downPressed && downChanged
                     && (game.block_types > MIN_BLOCK_TYPES))
             {
                 game.block_types--;
             }
-            if ((control_check (CONTROL_DPAD_UP).pressed)
-                    && (control_check (CONTROL_DPAD_UP).changed)
+            if (upPressed && upChanged
                     && (game.block_types < MAX_BLOCK_TYPES))
             {
                 game.block_types++;
             }
-            if (((control_check (CONTROL_BUTTON_START).pressed) && (control_check (CONTROL_BUTTON_START).changed))
-                    || ((control_check (CONTROL_BUTTON_A).pressed) && (control_check (CONTROL_BUTTON_A).changed))
-                    || ((control_check (CONTROL_BUTTON_B).pressed) && (control_check (CONTROL_BUTTON_B).changed))
-                    )
+            if (enterPressed && enterChanged)
             {
                 main_state_machine = STATE_running;
             }
-            gfx_render_target_clear (DEFAULT_BG_COLOR);
+            SDL_BlitSurface( background, NULL, screen, NULL );
             for (i = 0; i < sizeof(info) / sizeof(info[0]); i++)
             {
                 gfx_font_print (0, TEXT_Y(i), gameFontSmall, (char*) info[i]);
@@ -946,12 +969,11 @@ bool_t handleMainStateMachine (void)
             i++;
             snprintf (s, sizeof (s), ">>> Difficulty: %i <<<", game.block_types);
             gfx_font_print_center (TEXT_Y(i), gameFontSmall, s);
-            display_flip (gameDisplay);
+            SDL_Flip(screen);
             break;
         case STATE_running:
             handleMovement ();
-            if (control_check (CONTROL_BUTTON_START).pressed
-                    && control_check (CONTROL_BUTTON_START).changed)
+            if (enterPressed && enterChanged)
             {
                 main_state_machine = STATE_paused;
             }
@@ -975,11 +997,11 @@ bool_t handleMainStateMachine (void)
             }
             break;
         case STATE_paused:
-            if (control_check (CONTROL_BUTTON_START).pressed
-                    && control_check (CONTROL_BUTTON_START).changed)
+            if (enterPressed && enterChanged)
             {
                 main_state_machine = STATE_running;
             }
+#if 0
             if (music_initted)
             {
                 if (control_check (CONTROL_DPAD_DOWN).pressed
@@ -1012,21 +1034,22 @@ bool_t handleMainStateMachine (void)
                     }
                 }
             }
+#endif
             drawGameScreen ();
             break;
         case STATE_game_over:
-            if (control_check (CONTROL_BUTTON_START).pressed
-                    && control_check(CONTROL_BUTTON_START).changed)
+            if (enterPressed && enterChanged)
             {
                 /* Restart game */
                 replay = TRUE;
             }
-            if (control_check (CONTROL_BUTTON_X).pressed
-                    && control_check(CONTROL_BUTTON_X).changed)
-            {
-                /* Quit */
-                gameRunning = FALSE;
-            }
+//            if (control_check (CONTROL_BUTTON_X).pressed
+//                    && control_check(CONTROL_BUTTON_X).changed)
+//            {
+//                /* Quit */
+//                gameRunning = FALSE;
+//            }
+#if 0
             if (music_initted)
             {
                 if (control_check (CONTROL_DPAD_DOWN).pressed
@@ -1059,8 +1082,10 @@ bool_t handleMainStateMachine (void)
                     }
                 }
             }
+#endif
             drawGameScreen ();
             break;
+#if 0
         case STATE_select_name:
             if ((control_check (CONTROL_BUTTON_A).pressed)
                     || (control_check (CONTROL_BUTTON_A).changed))
@@ -1148,6 +1173,7 @@ bool_t handleMainStateMachine (void)
             vrtkey_draw();
             display_flip (gameDisplay);
             break;
+#endif
         default:
         case STATE_undefined:
             /* This should not happen */
@@ -1175,15 +1201,118 @@ uint8_t myrand (void)
     return random;
 }
 
-#if 0
+void key_pressed(uint8_t key_index, bool_t pressed)
+{
+    if (key_index < MAX_KEYS)
+    {
+        keys[key_index].changed = TRUE;
+        keys[key_index].pressed = pressed;
+        if (pressed)
+        {
+            keys[key_index].pressTick = SDL_GetTicks() + keys[key_index].repeatTick;
+        }
+        else
+        {
+            keys[key_index].pressTick = 0;
+        }
+    }
+    else
+    {
+        printf("%s internal error\r\n", __FUNCTION__);
+    }
+}
+
+void key_task()
+{
+    int i;
+    SDL_Event event;
+
+    for (i = 0; i < MAX_KEYS; i++)
+    {
+        keys[i].changed = FALSE;
+        if (keys[i].pressed && keys[i].pressTick < SDL_GetTicks())
+        {
+            /* Simulate key has just pressed */
+            keys[i].changed = TRUE;
+            keys[i].pressTick = SDL_GetTicks() + keys[i].repeatTick;
+        }
+    }
+
+    while (SDL_PollEvent(&event))
+    {
+        if (event.type == SDL_KEYDOWN)
+        {
+            switch (event.key.keysym.sym)
+            {
+                case SDLK_UP:
+                    key_pressed(KEY_UP, TRUE);
+                    break;
+                case SDLK_DOWN:
+                    key_pressed(KEY_DOWN, TRUE);
+                    break;
+                case SDLK_LEFT:
+                    key_pressed(KEY_LEFT, TRUE);
+                    break;
+                case SDLK_RIGHT:
+                    key_pressed(KEY_RIGHT, TRUE);
+                    break;
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER:
+                    key_pressed(KEY_ENTER, TRUE);
+                    break;
+                case SDLK_SPACE:
+                    key_pressed(KEY_SPACE, TRUE);
+                    break;
+                case SDLK_ESCAPE:
+                    gameRunning = FALSE;
+                    break;
+                default:
+                    break;
+            }
+        }
+        else if (event.type == SDL_KEYUP)
+        {
+            switch (event.key.keysym.sym)
+            {
+                case SDLK_UP:
+                    key_pressed(KEY_UP, FALSE);
+                    break;
+                case SDLK_DOWN:
+                    key_pressed(KEY_DOWN, FALSE);
+                    break;
+                case SDLK_LEFT:
+                    key_pressed(KEY_LEFT, FALSE);
+                    break;
+                case SDLK_RIGHT:
+                    key_pressed(KEY_RIGHT, FALSE);
+                    break;
+                case SDLK_RETURN:
+                case SDLK_KP_ENTER:
+                    key_pressed(KEY_ENTER, FALSE);
+                    break;
+                case SDLK_SPACE:
+                    key_pressed(KEY_SPACE, FALSE);
+                    break;
+                default:
+                    break;
+            }
+        }
+        else if (event.type == SDL_QUIT) /* If the user has Xed out the window */
+        {
+            /* Quit the program */
+            gameRunning = FALSE;
+        }
+    }
+
+    //  collectRandomNumbers ();
+}
+
 /**
  * @brief run
  * Play game.
  */
 void run (void)
 {
-    uint32_t tempTick    = 0;
-    uint32_t tempPauseOS = 0;
     bool_t   do_replay   = FALSE;
 
 replay:
@@ -1199,74 +1328,11 @@ replay:
 
     while (gameRunning)
     {
-        sysref = _sys_judge_event (NULL);
-        if (sysref < 0)
+        key_task();
+        do_replay = handleMainStateMachine ();
+        if (do_replay)
         {
-            ref = sysref;
-            break;
-        }
-
-        tempTick += timer_delta (gfxTimer);
-        if (tempTick < gameTickRate)
-        {
-            tempPauseOS = (((gameTickRate - tempTick) * OS_TICKS_PER_SEC) / timer_resolution);
-            if (tempPauseOS > 0)
-            {
-                OSTimeDly (tempPauseOS);
-            }
-            while (tempTick < gameTickRate)
-            {
-                tempTick += timer_delta (gfxTimer);
-            }
-        }
-
-
-        if (tempTick > (gameTickRate << 2))
-        {
-            tempTick = 0; // HACK - Fixes timing glitch of unknown origin.
-        }
-        while (tempTick >= gameTickRate)
-        {
-            tempTick -= gameTickRate;
-
-            control_poll();
-            collectRandomNumbers ();
-            /* This buttons are working in every state */
-            if (control_check (CONTROL_BUTTON_START).pressed
-                    && control_check(CONTROL_BUTTON_SELECT).pressed)
-            {
-                /* Quit from game */
-                gameRunning = FALSE;
-                break;
-            }
-            if (control_check (CONTROL_TRIGGER_LEFT).pressed
-                    && control_check (CONTROL_TRIGGER_LEFT).changed)
-            {
-                if (config.volume >= VOLUME_DELTA + VOLUME_MIN)
-                {
-                    config.volume -= VOLUME_DELTA;
-                }
-            }
-            if (control_check (CONTROL_TRIGGER_RIGHT).pressed
-                    && control_check (CONTROL_TRIGGER_RIGHT).changed)
-            {
-                if (config.volume <= VOLUME_MAX - VOLUME_DELTA)
-                {
-                    config.volume += VOLUME_DELTA;
-                }
-            }
-            if (control_check (CONTROL_BUTTON_Y).pressed
-                    && control_check (CONTROL_BUTTON_Y).changed)
-            {
-                config.music_paused = !config.music_paused;
-                audiothread_pause (config.music_paused);
-            }
-
-            do_replay = handleMainStateMachine ();
-            if (do_replay)
-            {
-                goto replay; /* Shh! Bad thing! */
-            }
+            goto replay; /* Shh! Bad thing! */
         }
     }
 }
@@ -1283,6 +1349,7 @@ void done (void)
         saveGame ();
     }
 
+#if 0
     vrtkey_term ();
 
     if (music_initted)
@@ -1292,16 +1359,18 @@ void done (void)
     }
 
     saveConfig ();
+#endif
 
-    timer_delete (gfxTimer);
-    gfx_font_delete (gameFontSmall);
+    freeBlocks();
 
-    gfx_term ();
-    display_delete (gameDisplay);
-    control_term ();
+    //Free the loaded image
+    SDL_FreeSurface( background );
+
+    //Quit SDL
+    SDL_Quit();
 }
 
-int main(int argc, char** argv)
+int main( int argc, char* argv[] )
 {
     (void)argc;
     (void)argv;
@@ -1311,123 +1380,6 @@ int main(int argc, char** argv)
         run ();
         done ();
     }
-    else
-    {
-        ref = EXIT_FAILURE;
-    }
-
-    return ref;
-}
-#endif
-
-int main( int argc, char* args[] )
-{
-    // The images
-    SDL_Surface* hello = NULL;
-    SDL_Surface* screen = NULL;
-
-    //Start SDL
-    SDL_Init( SDL_INIT_EVERYTHING );
-
-    //Set up screen
-    screen = SDL_SetVideoMode( 640, 480, 32, SDL_SWSURFACE );
-
-    //Load image
-    hello = SDL_LoadBMP( "hello.bmp" );
-
-    //Apply image to screen
-    SDL_BlitSurface( hello, NULL, screen, NULL );
-
-    // Initialize SDL_ttf library
-    if (TTF_Init() != 0)
-    {
-        printf("TTF_Init() Failed: %s\n", TTF_GetError());
-        SDL_Quit();
-        exit(1);
-    }
-
-    // Load a font
-    TTF_Font *font;
-    font = TTF_OpenFont("/usr/share/fonts/TTF/FreeSans.ttf", 24);
-    if (font == NULL)
-    {
-        printf("TTF_OpenFont() Failed: %s\n", TTF_GetError());
-        TTF_Quit();
-        SDL_Quit();
-        exit(1);
-    }
-
-    // Write text to surface
-    SDL_Surface *text;
-    SDL_Color text_color = {0, 0, 0};
-    text = TTF_RenderText_Solid(font,
-                                "A journey of a thousand miles begins with a single step.",
-                                text_color);
-
-    if (text == NULL)
-    {
-        printf("TTF_RenderText_Solid() Failed: %s\n", TTF_GetError());
-        TTF_Quit();
-        SDL_Quit();
-        exit(1);
-    }
-
-    SDL_Rect rect;
-    rect.x = 10;
-    rect.y = 450;
-    rect.w = text->clip_rect.w;
-    rect.h = text->clip_rect.h;
-
-    // Apply the text to the display
-    if (SDL_BlitSurface(text, NULL, screen, &rect) != 0)
-    {
-        printf("SDL_BlitSurface() Failed: %s\n", SDL_GetError());
-    }
-
-    //Update Screen
-    SDL_Flip( screen );
-
-    //Pause
-    //SDL_Delay( 2000 );
-    while (gameRunning)
-    {
-        //While there's an event to handle
-        while (SDL_PollEvent(&event))
-        {
-            if (event.type == SDL_KEYDOWN)
-            {
-                switch (event.key.keysym.sym)
-                {
-                    case SDLK_UP:
-                        printf("up\r\n");
-                        break;
-                    case SDLK_DOWN:
-                        printf("down\r\n");
-                        break;
-                    case SDLK_LEFT:
-                        printf("left\r\n");
-                        break;
-                    case SDLK_RIGHT:
-                        printf("right\r\n");
-                        break;
-                    case SDLK_ESCAPE:
-                        gameRunning = FALSE;
-                        break;
-                }
-            }
-            else if (event.type == SDL_QUIT) /* If the user has Xed out the window */
-            {
-                /* Quit the program */
-                gameRunning = FALSE;
-            }
-        }
-    }
-
-    //Free the loaded image
-    SDL_FreeSurface( hello );
-
-    //Quit SDL
-    SDL_Quit();
 
     return 0;
 }

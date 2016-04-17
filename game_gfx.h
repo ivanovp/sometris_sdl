@@ -12,6 +12,8 @@
 
 #include "game_common.h"
 
+#include <SDL/SDL.h>
+
 #define DEFAULT_BG_COLOR        gfx_color_rgb (0x00, 0x00, 0x00)    /* Black */
 #define TRANSPARENT_BG_COLOR    gfx_color_rgb (0xFF, 0x00, 0xFF)    /* Magenta */
 
@@ -20,6 +22,12 @@
 
 #define BLOCK_SIZE_X_PX         16
 #define BLOCK_SIZE_Y_PX         16
+
+#define FONT_SMALL_SIZE_X_PX    8
+#define FONT_SMALL_SIZE_Y_PX    8
+
+#define FONT_NORMAL_SIZE_X_PX   8
+#define FONT_NORMAL_SIZE_Y_PX   16
 
 #if MAP_SIZE_X_PX > 320
 #error MAP_SIZE_X_PX greater than width of LCD!
@@ -30,11 +38,26 @@
 
 #define TEXT_X_0        (MAP_SIZE_X_PX + 5)
 #define TEXT_Y_0        (0)
-#define TEXT_X(x)       (TEXT_X_0 + gfx_font_width (gameFontSmall, "X") * (x))
-#define TEXT_Y(y)       (TEXT_Y_0 + (gfx_font_height (gameFontSmall) + 4) * (y))
-#define TEXT_XN(x)      (TEXT_X_0 + gfx_font_width (gameFontNormal, "X") * (x))
-#define TEXT_YN(y)      (TEXT_Y_0 + (gfx_font_height (gameFontNormal)) * (y))
+#define TEXT_X(x)       (TEXT_X_0 + FONT_SMALL_SIZE_X_PX * (x))
+#define TEXT_Y(y)       (TEXT_Y_0 + (FONT_SMALL_SIZE_Y_PX + 4) * (y))
+#define TEXT_XN(x)      (TEXT_X_0 + FONT_NORMAL_SIZE_X_PX * (x))
+#define TEXT_YN(y)      (TEXT_Y_0 + FONT_NORMAL_SIZE_Y_PX * (y))
 
+#define GFX_DIR                 "gfx/"
+#define BACKGROUND_PNG          GFX_DIR "bg.png"
+#define BLOCK_PNG               GFX_DIR "block%i.png"
+
+#define gfx_color_rgb(r,g,b)                    ( ( r << 24 ) | ( g << 16 ) | ( b << 8 ) | 0xFF )
+#define gfx_line_draw(x1, y1, x2, y2, color)    lineColor(screen, x1, y1, x2, y2, color)
+#define gfx_font_print(x,y,font,s)              stringColor(screen, x, y, s, gfx_color_rgb(0xFF, 0xFF, 0xFF));
+#define gfx_font_print_fromright(x,y,font,s)    stringColor(screen, x - strlen(s) * FONT_NORMAL_SIZE_X_PX, y, s, gfx_color_rgb(0xFF, 0xFF, 0xFF));
+#define gfx_font_print_center(y, font, s)       stringColor(screen, screen->w / 2 - strlen(s) / 2 * FONT_NORMAL_SIZE_X_PX, y, s, gfx_color_rgb(0xFF, 0xFF, 0xFF))
+
+extern SDL_Surface* background;
+extern SDL_Surface* screen;
+
+void loadBlocks();
+void freeBlocks();
 void drawBlock (uint8_t x, uint8_t y, uint8_t shape);
 void printCommon (void);
 void drawGameScreen (void);

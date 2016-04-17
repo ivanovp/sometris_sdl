@@ -33,3 +33,6 @@
 
 # Qt creator
 *.pro.user*
+
+# Dependency
+*.d

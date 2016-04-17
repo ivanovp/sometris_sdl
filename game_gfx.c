@@ -14,21 +14,88 @@
 #include <stdint.h>
 
 #include <SDL/SDL.h>
+#include <SDL/SDL_image.h>
+#include <SDL/SDL_gfxPrimitives.h>
 
 #include "game_common.h"
 #include "game_gfx.h"
 
-#define sprite_draw(...)
-#define gfx_line_draw(...)
-#define gfx_font_print(...)
-#define gfx_font_print_fromright(...)
-#define gfx_font_print_center(...)
-#define gfx_render_target_clear(...)
-#define display_flip(...)
+/* Block sprites */
+SDL_Surface * blocks[MAX_BLOCK_TYPES];
+
+SDL_Surface * loadImage(const char* filename)
+{
+  SDL_Surface* loadedImage = NULL;
+  SDL_Surface* optimizedImage = NULL;
+
+  printf("Loading %s...", filename);
+  loadedImage = IMG_Load (filename);
+
+  // Check if image loaded
+  if (loadedImage != NULL)
+  {
+      // Create an optimized image
+      optimizedImage = SDL_DisplayFormat (loadedImage);
+
+      // Free the old image
+      SDL_FreeSurface (loadedImage);
+
+      if (optimizedImage != NULL)
+      {
+          // Map the color key
+          Uint32 colorkey = SDL_MapRGB (optimizedImage->format, 0xFF, 0, 0xFF);
+
+          // Set all pixels of color R 0xFF, G 0, B 0xFF to be transparent
+          SDL_SetColorKey (optimizedImage, SDL_SRCCOLORKEY, colorkey);
+
+          printf("Done\n");
+      }
+      else
+      {
+        printf("Error: cannot optimize image!\n");
+      }
+  }
+  else
+  {
+    printf("Error: cannot load image!\n");
+  }
+
+  // Return the optimized image
+  return optimizedImage;
+}
+
+void loadBlocks()
+{
+  int i;
+  char filename[64];
+
+  for ( i = 0; i < MAX_BLOCK_TYPES; i++)
+  {
+    snprintf(filename, sizeof(filename), BLOCK_PNG, i);
+    blocks[i] = loadImage(filename);
+  }
+}
+
+void freeBlocks()
+{
+  int i;
+
+  for ( i = 0; i < MAX_BLOCK_TYPES; i++)
+  {
+    printf("Releasing block %i\r\n", i);
+    SDL_FreeSurface(blocks[i]);
+  }
+}
 
 void drawBlock (uint8_t x, uint8_t y, uint8_t shape)
 {
-    sprite_draw (blockSprite, x * blockSprite->width, y * blockSprite->height, shape);
+  SDL_Rect offset;
+
+  offset.x = x * BLOCK_SIZE_X_PX;
+  offset.y = y * BLOCK_SIZE_Y_PX;
+
+  // Blit the surface
+  SDL_BlitSurface( blocks[shape], NULL, screen, &offset );
 }
 
 void printCommon (void)
@@ -42,10 +109,11 @@ void printCommon (void)
     gfx_font_print(TEXT_X(0), TEXT_YN(0), gameFontNormal, s);
     sprintf (s, "Level: %i", game.level);
     gfx_font_print(TEXT_X(0), TEXT_YN(1), gameFontNormal, s);
+#if 0
     if (music_initted)
     {
         gfx_line_draw (MAP_SIZE_X_PX + 1, TEXT_YN(2),
-                       gameDisplay->width - 1, TEXT_YN(2),
+                       screen->w - 1, TEXT_YN(2),
                        gfx_color_rgb (0xFF, 0xFF, 0xFF));
         if (!config.music_paused)
         {
@@ -68,6 +136,7 @@ void printCommon (void)
             gfx_font_print(TEXT_X(0), TEXT_YN(6), gameFontNormal, s);
         }
     }
+#endif
     if (GAME_IS_OVER())
     {
         gfx_font_print (TEXT_X_0, TEXT_YN(8), gameFontNormal, "** GAME **");
@@ -82,7 +151,7 @@ void printCommon (void)
         snprintf (s, sizeof (s), "Sometris v%i.%i.%i", VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
         gfx_font_print(TEXT_X_0, TEXT_Y(11), gameFontSmall, s);
         gfx_font_print(TEXT_X_0, TEXT_Y(12), gameFontSmall, "Copyright (C) Peter");
-        gfx_font_print(TEXT_X_0, TEXT_Y(13), gameFontSmall, "Ivanov, 2013-2014");
+        gfx_font_print(TEXT_X_0, TEXT_Y(13), gameFontSmall, "Ivanov, 2013-2016");
         gfx_font_print(TEXT_X_0, TEXT_Y(14), gameFontSmall, "ivanovp@gmail.com");
         gfx_font_print(TEXT_X_0, TEXT_Y(15), gameFontSmall, "http://dev.ivanov.eu");
 //        gfx_font_print(TEXT_X_0, TEXT_Y(14), gameFontSmall, "Licence: GPLv2");
@@ -110,11 +179,11 @@ void printCommon (void)
     /* Small debug */
     snprintf (s, sizeof (s), "C:%i", game.figure_counter);
     gfx_font_print (TEXT_X_0,
-                    (gameDisplay->height - (gfx_font_height(gameFontSmall) + 4)),
+                    (screen->h - FONT_SMALL_SIZE_Y_PX - 4),
                     gameFontSmall, s);
     snprintf (s, sizeof (s), "v%lu.%lu.%lu", VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
-    gfx_font_print_fromright ((gameDisplay->width - 4),
-                              (gameDisplay->height - (gfx_font_height(gameFontSmall) + 4)), gameFontSmall, s);
+    gfx_font_print_fromright ((screen->w - 4),
+                              (screen->h - FONT_SMALL_SIZE_Y_PX - 4), gameFontSmall, s);
 }
 
 static void drawRecord (uint8_t aBlockType)
@@ -139,7 +208,9 @@ static void drawRecord (uint8_t aBlockType)
 
 void drawGameScreen (void)
 {
-    gfx_render_target_clear (DEFAULT_BG_COLOR);
+    // Restore background
+    SDL_BlitSurface( background, NULL, screen, NULL );
+
     printCommon ();
     if (GAME_IS_PAUSED() || GAME_IS_OVER())
     {
@@ -150,7 +221,8 @@ void drawGameScreen (void)
         drawMap ();
         drawFigure ();
     }
-    display_flip (gameDisplay);
+
+    SDL_Flip( screen );
 }
 
 /**
@@ -163,42 +235,30 @@ void blinkMap (uint8_t blinkNum)
 {
     uint8_t i;
     uint8_t x, y;
+    SDL_Event event;
 
     /* Blink same blocks */
-    for (i = 0; i < blinkNum * 2; i++)
+    for (i = 0; i < blinkNum * 2 && gameRunning; i++)
     {
-#if 0
-        sysref = _sys_judge_event(NULL);
-        if (sysref < 0) 
+        key_task();
+        if (gameRunning)
         {
-            ref = sysref;
-            break;
-        }
+          SDL_BlitSurface( background, NULL, screen, NULL );
+          printCommon ();
 
-        control_poll ();
-        if (control_check (CONTROL_BUTTON_START).pressed
-                && control_check(CONTROL_BUTTON_SELECT).pressed)
-        {
-            gameRunning = FALSE;
-            break;
-        }
-
-        gfx_render_target_clear (DEFAULT_BG_COLOR);
-        printCommon ();
-
-        for (x = 0; x < MAP_SIZE_X; x++)
-        {
+          for (x = 0; x < MAP_SIZE_X; x++)
+          {
             for (y = 0; y < MAP_SIZE_Y; y++)
             {
-                if (!MAP_IS_SELECTED(x, y) || (i & 1))
-                {
-                    drawBlock (x, y, MAP(x,y));
-                }
+              if (!MAP_IS_SELECTED(x, y) || (i & 1))
+              {
+                drawBlock (x, y, MAP(x,y));
+              }
             }
+          }
+          SDL_Flip( screen );
+          SDL_Delay( 200 ); /* 200 ms */
         }
-        display_flip (gameDisplay);
-        OSTimeDly (OS_TICKS_PER_SEC / 5); /* 200 ms */
-#endif
     }
 }
 
@@ -299,7 +359,7 @@ void shiftDownColumn (uint8_t x0, uint8_t y0)
  */
 void drawInfoScreen (const char* aInfo)
 {
-    gfx_render_target_clear (DEFAULT_BG_COLOR);
-    gfx_font_print_center (gameDisplay->height / 2, gameFontNormal, aInfo);
-    display_flip (gameDisplay);
+    SDL_BlitSurface( background, NULL, screen, NULL );
+    gfx_font_print_center (screen->h / 2, gameFontNormal, aInfo);
+    SDL_Flip( screen );
 }

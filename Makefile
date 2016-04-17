@@ -17,7 +17,7 @@ CPP_OPTS  = -O2 $(INCLUDE) $(W_OPTS) -D_DEBUG -c
 CC_OPTS   = -O2 $(INCLUDE) $(W_OPTS) -D_DEBUG -c
 CC_OPTS_A = $(CC_OPTS) -D_ASSEMBLER_
 
-LIBS      = -lc -lm -lSDL -lSDL_ttf
+LIBS      = -lc -lm -lSDL -lSDL_ttf -lSDL_gfx -lSDL_image
 
 LD_OPTS   = $(LIBS) -o $(APP_NAME)
 
