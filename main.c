@@ -19,6 +19,7 @@
 #include <SDL/SDL_image.h>
 #include <SDL/SDL_timer.h>
 #include <SDL/SDL_ttf.h>
+#include <SDL/SDL_gfxPrimitives.h>
 
 #include "game_common.h"
 #include "game_gfx.h"
@@ -64,12 +65,13 @@ typedef struct
 const char* info[] =
 {
     "This is sometris, a tetris-like game.",
-    "Copyright (C) Peter Ivanov <ivanovp@gmail.com>, 2013",
-    "This program comes with ABSOLUTELY NO WARRANTY;",
-    "for details see COPYING.",
-    "This is free software, and you are welcome to",
-    "redistribute it under certain conditions; see COPYING",
-    "for details.",
+    "Copyright (C) Peter Ivanov",
+    "<ivanovp@gmail.com>, 2013-2016",
+    "This program comes with ABSOLUTELY NO",
+    "WARRANTY; for details see COPYING.",
+    "This is free software, and you are",
+    "welcome to redistribute it under certain",
+    "conditions; see COPYING for details.",
     "During play you can use these buttons:",
     "ENTER: Pause game",
     "ESCAPE: Exit game",
@@ -136,6 +138,10 @@ config_t config =
 // The images
 SDL_Surface* background = NULL;
 SDL_Surface* screen = NULL;
+bool_t textInputIsStarted = FALSE;
+bool_t textInputIsFinished = FALSE;
+char * text = NULL;
+uint32_t textLength = 0;
 
 /**
  * Set up default configuration and load if configuration file exists.
@@ -331,6 +337,23 @@ void insertRecord (uint8_t aBlockType, uint8_t aScore)
         config.records[RECORD_TYPE(aBlockType)][pos].level = game.level;
         config.records[RECORD_TYPE(aBlockType)][pos].score = game.score;
     }
+}
+
+void startTextInput(char * atext, uint32_t length)
+{
+  textInputIsStarted = TRUE;
+  textInputIsFinished = FALSE;
+  text = atext;
+  textLength = length;
+  text[0] = 0;
+}
+
+void stopTextInput(void)
+{
+  if (textInputIsStarted)
+  {
+    textInputIsStarted = FALSE;
+  }
 }
 
 #if 0
@@ -816,9 +839,6 @@ bool_t init (void)
 
     can_load_game = canLoadGame ();
 
-    /* Music (MOD/XM/S3M files) */
-//    initPlaylist ();
-
     return TRUE;
 }
 
@@ -905,7 +925,6 @@ void handleMovement (void)
 #endif
 }
 
-#if 1
 /**
  * @brief handle_main_state_machine
  * Check inputs and change state machine if it is necessary.
@@ -916,7 +935,6 @@ bool_t handleMainStateMachine (void)
     bool_t replay = FALSE;
     char s[32];
     uint8_t i;
-    uint8_t vrtkey_ret;
 
     switch (main_state_machine)
     {
@@ -1001,40 +1019,6 @@ bool_t handleMainStateMachine (void)
             {
                 main_state_machine = STATE_running;
             }
-#if 0
-            if (music_initted)
-            {
-                if (control_check (CONTROL_DPAD_DOWN).pressed
-                        && control_check (CONTROL_DPAD_DOWN).changed)
-                {
-                    if (config.volume >= VOLUME_DELTA + VOLUME_MIN)
-                    {
-                        config.volume -= VOLUME_DELTA;
-                    }
-                }
-                if (control_check (CONTROL_DPAD_UP).pressed
-                        && control_check (CONTROL_DPAD_UP).changed)
-                {
-                    if (config.volume <= VOLUME_MAX - VOLUME_DELTA)
-                    {
-                        config.volume += VOLUME_DELTA;
-                    }
-                }
-                if (playlist_loaded)
-                {
-                    if (control_check (CONTROL_DPAD_LEFT).pressed
-                            && control_check (CONTROL_DPAD_LEFT).changed)
-                    {
-                        audiothread_playPrev ();
-                    }
-                    if (control_check (CONTROL_DPAD_RIGHT).pressed
-                            && control_check (CONTROL_DPAD_RIGHT).changed)
-                    {
-                        audiothread_playNext ();
-                    }
-                }
-            }
-#endif
             drawGameScreen ();
             break;
         case STATE_game_over:
@@ -1049,46 +1033,13 @@ bool_t handleMainStateMachine (void)
 //                /* Quit */
 //                gameRunning = FALSE;
 //            }
-#if 0
-            if (music_initted)
-            {
-                if (control_check (CONTROL_DPAD_DOWN).pressed
-                        && control_check (CONTROL_DPAD_DOWN).changed)
-                {
-                    if (config.volume >= VOLUME_DELTA + VOLUME_MIN)
-                    {
-                        config.volume -= VOLUME_DELTA;
-                    }
-                }
-                if (control_check (CONTROL_DPAD_UP).pressed
-                        && control_check (CONTROL_DPAD_UP).changed)
-                {
-                    if (config.volume <= VOLUME_MAX - VOLUME_DELTA)
-                    {
-                        config.volume += VOLUME_DELTA;
-                    }
-                }
-                if (playlist_loaded)
-                {
-                    if (control_check (CONTROL_DPAD_LEFT).pressed
-                            && control_check (CONTROL_DPAD_LEFT).changed)
-                    {
-                        audiothread_playPrev ();
-                    }
-                    if (control_check (CONTROL_DPAD_RIGHT).pressed
-                            && control_check (CONTROL_DPAD_RIGHT).changed)
-                    {
-                        audiothread_playNext ();
-                    }
-                }
-            }
-#endif
             drawGameScreen ();
             break;
-#if 0
         case STATE_select_name:
-            if ((control_check (CONTROL_BUTTON_A).pressed)
-                    || (control_check (CONTROL_BUTTON_A).changed))
+            // Restore background
+            SDL_BlitSurface (background, NULL, screen, NULL);
+
+            if (enterPressed && enterChanged)
             {
                 if (strlen (config.player_names[config.player_idx]) > 0)
                 {
@@ -1101,28 +1052,24 @@ bool_t handleMainStateMachine (void)
                     main_state_machine = STATE_set_name;
                 }
             }
-            if ((control_check (CONTROL_BUTTON_B).pressed)
-                    || (control_check (CONTROL_BUTTON_B).changed))
+            if (spacePressed && spaceChanged)
             {
                 main_state_machine = STATE_set_name;
             }
-            if ((control_check (CONTROL_DPAD_DOWN).pressed)
-                    && (control_check (CONTROL_DPAD_DOWN).changed))
+            if (downPressed && downChanged)
             {
                 if (config.player_idx < MAX_PLAYERS - 1)
                 {
                     config.player_idx++;
                 }
             }
-            if ((control_check (CONTROL_DPAD_UP).pressed)
-                    && (control_check (CONTROL_DPAD_UP).changed))
+            if (upPressed && upChanged)
             {
                 if (config.player_idx > 0)
                 {
                     config.player_idx--;
                 }
             }
-            gfx_render_target_clear (DEFAULT_BG_COLOR);
             printCommon ();
             gfx_font_print (0, TEXT_Y(0), gameFontSmall, "Select your name:");
             for (i = 0; i < MAX_PLAYERS; i++)
@@ -1145,35 +1092,32 @@ bool_t handleMainStateMachine (void)
                 snprintf (s, sizeof (s), "%c%c%c %-9s %c%c%c", c, c, c, name, c2, c2, c2);
                 gfx_font_print (0, TEXT_Y(i + 1), gameFontSmall, s);
             }
-            gfx_font_print (0, TEXT_Y(i + 2), gameFontSmall, "A: Select name");
-            gfx_font_print (0, TEXT_Y(i + 3), gameFontSmall, "B: Change name");
-            display_flip (gameDisplay);
+            gfx_font_print (0, TEXT_Y(i + 2), gameFontSmall, "Enter: Select name");
+            gfx_font_print (0, TEXT_Y(i + 3), gameFontSmall, "Space: Change name");
+            SDL_Flip (screen);
             break;
         case STATE_set_name:
-            if (!vrtkey_isopen ())
+            if (!textInputIsStarted)
             {
-                vrtkey_open (config.player_names[config.player_idx], PLAYER_NAME_LENGTH, false);
+              startTextInput(config.player_names[config.player_idx], PLAYER_NAME_LENGTH);
             }
-            vrtkey_ret = vrtkey_update ();
-            switch (vrtkey_ret)
-            {
-                case VRTKEY_ACCEPT:
-                    insertRecord (game.block_types, game.score);
-                    saveConfig ();
-                    main_state_machine = STATE_game_over;
-                    vrtkey_close (false);
-                    break;
-                case VRTKEY_CANCEL:
-                    main_state_machine = STATE_game_over;
-                    vrtkey_close (false);
-                    break;
-            }
-            gfx_render_target_clear (DEFAULT_BG_COLOR);
+            // Restore background
+            SDL_BlitSurface (background, NULL, screen, NULL);
             gfx_font_print (0, TEXT_Y(0), gameFontNormal, "Set your name:");
-            vrtkey_draw();
-            display_flip (gameDisplay);
+            rectangleRGBA( screen, 1, TEXT_Y(1) - 2, FONT_NORMAL_SIZE_X_PX * PLAYER_NAME_LENGTH + 3, TEXT_Y(2) - 1,
+                           255, 255, 255, 255);
+            gfx_font_print (2, TEXT_Y(1), gameFontNormal, text);
+
+            if (enterPressed && enterChanged)
+            {
+                stopTextInput();
+                insertRecord (game.block_types, game.score);
+                saveConfig ();
+                main_state_machine = STATE_game_over;
+            }
+            gfx_font_print (0, TEXT_Y(3), gameFontSmall, "Enter: Finish editing");
+            SDL_Flip (screen);
             break;
-#endif
         default:
         case STATE_undefined:
             /* This should not happen */
@@ -1182,7 +1126,6 @@ bool_t handleMainStateMachine (void)
 
     return replay;
 }
-#endif
 
 /**
  * @brief myrand
@@ -1242,6 +1185,32 @@ void key_task()
     {
         if (event.type == SDL_KEYDOWN)
         {
+            if (textInputIsStarted)
+            {
+              uint32_t len = strnlen(text, textLength);
+              if (event.key.keysym.sym >= 32 && event.key.keysym.sym <= 126)
+              {
+                if (len < textLength - 1)
+                {
+                    text[len] = event.key.keysym.sym;
+                    if (event.key.keysym.mod & (KMOD_RSHIFT | KMOD_LSHIFT) )
+                    {
+                      text[len] &= 0xDF;
+                    }
+                    text[len + 1] = 0;
+                }
+              }
+              if (event.key.keysym.sym == SDLK_BACKSPACE && len > 0)
+              {
+                text[len - 1] = 0;
+              }
+              if (event.key.keysym.sym == SDLK_RETURN
+                   || event.key.keysym.sym == SDLK_KP_ENTER)
+              {
+                textInputIsFinished = TRUE;
+              }
+            }
+
             switch (event.key.keysym.sym)
             {
                 case SDLK_UP:
@@ -1302,6 +1271,22 @@ void key_task()
             /* Quit the program */
             gameRunning = FALSE;
         }
+//        else if (event.type == SDL_TEXTINPUT)
+//        {
+//          /* Add new text onto the end of our text */
+//          strcat(text, event.text.text);
+//        }
+//        else if (event.type == SDL_TEXTEDITING)
+//        {
+//          /*
+//            Update the composition text.
+//            Update the cursor position.
+//            Update the selection length (if any).
+//          */
+//          composition = event.edit.text;
+//          cursor = event.edit.start;
+//          selection_len = event.edit.length;
+//        }
     }
 
     //  collectRandomNumbers ();
@@ -1349,17 +1334,7 @@ void done (void)
         saveGame ();
     }
 
-#if 0
-    vrtkey_term ();
-
-    if (music_initted)
-    {
-        audiothread_term ();
-        donePlaylist ();
-    }
-
     saveConfig ();
-#endif
 
     freeBlocks();
 

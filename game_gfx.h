@@ -15,7 +15,6 @@
 #include <SDL/SDL.h>
 
 #define DEFAULT_BG_COLOR        gfx_color_rgb (0x00, 0x00, 0x00)    /* Black */
-#define TRANSPARENT_BG_COLOR    gfx_color_rgb (0xFF, 0x00, 0xFF)    /* Magenta */
 
 #define MAP_SIZE_X_PX           (MAP_SIZE_X * BLOCK_SIZE_X_PX)
 #define MAP_SIZE_Y_PX           (MAP_SIZE_Y * BLOCK_SIZE_Y_PX)
@@ -24,10 +23,10 @@
 #define BLOCK_SIZE_Y_PX         16
 
 #define FONT_SMALL_SIZE_X_PX    8
-#define FONT_SMALL_SIZE_Y_PX    8
+#define FONT_SMALL_SIZE_Y_PX    12
 
 #define FONT_NORMAL_SIZE_X_PX   8
-#define FONT_NORMAL_SIZE_Y_PX   16
+#define FONT_NORMAL_SIZE_Y_PX   12
 
 #if MAP_SIZE_X_PX > 320
 #error MAP_SIZE_X_PX greater than width of LCD!
@@ -39,9 +38,9 @@
 #define TEXT_X_0        (MAP_SIZE_X_PX + 5)
 #define TEXT_Y_0        (0)
 #define TEXT_X(x)       (TEXT_X_0 + FONT_SMALL_SIZE_X_PX * (x))
-#define TEXT_Y(y)       (TEXT_Y_0 + (FONT_SMALL_SIZE_Y_PX + 4) * (y))
+#define TEXT_Y(y)       (TEXT_Y_0 + (FONT_SMALL_SIZE_Y_PX) * (y))
 #define TEXT_XN(x)      (TEXT_X_0 + FONT_NORMAL_SIZE_X_PX * (x))
-#define TEXT_YN(y)      (TEXT_Y_0 + FONT_NORMAL_SIZE_Y_PX * (y))
+#define TEXT_YN(y)      (TEXT_Y_0 + (FONT_NORMAL_SIZE_Y_PX) * (y))
 
 #define GFX_DIR                 "gfx/"
 #define BACKGROUND_PNG          GFX_DIR "bg.png"

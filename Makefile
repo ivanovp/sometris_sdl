@@ -13,8 +13,8 @@ SOURCE    = .
 INCLUDE   = -I.
 
 W_OPTS    = -Wall -Wextra -finline-functions -fomit-frame-pointer -fno-builtin -fno-exceptions
-CPP_OPTS  = -O2 $(INCLUDE) $(W_OPTS) -D_DEBUG -c
-CC_OPTS   = -O2 $(INCLUDE) $(W_OPTS) -D_DEBUG -c
+CPP_OPTS  = -O0 $(INCLUDE) $(W_OPTS) -D_DEBUG -c -ggdb3
+CC_OPTS   = -O0 $(INCLUDE) $(W_OPTS) -D_DEBUG -c -ggdb3
 CC_OPTS_A = $(CC_OPTS) -D_ASSEMBLER_
 
 LIBS      = -lc -lm -lSDL -lSDL_ttf -lSDL_gfx -lSDL_image

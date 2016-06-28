@@ -32,7 +32,7 @@
 #define FIGURE_SIZE             3
 
 //#define RAND()                  myrand()
-#define RAND()                  rand() /* rand() is ineligible for this game! */
+#define RAND()                  rand() /* rand() may ineligible for this game! */
 
 #include "common.h"
 

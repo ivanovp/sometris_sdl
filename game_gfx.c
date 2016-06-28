@@ -141,19 +141,20 @@ void printCommon (void)
     {
         gfx_font_print (TEXT_X_0, TEXT_YN(8), gameFontNormal, "** GAME **");
         gfx_font_print (TEXT_X_0, TEXT_YN(9), gameFontNormal, "** OVER **");
-        gfx_font_print (TEXT_X_0, TEXT_YN(10), gameFontNormal, "Press START");
+        gfx_font_print (TEXT_X_0, TEXT_YN(10), gameFontNormal, "Press Enter");
         gfx_font_print (TEXT_X_0, TEXT_YN(11), gameFontNormal, "to replay,");
-        gfx_font_print (TEXT_X_0, TEXT_YN(12), gameFontNormal, "X to quit...");
+        gfx_font_print (TEXT_X_0, TEXT_YN(12), gameFontNormal, "Escape to quit...");
     }
     else if (GAME_IS_PAUSED())
     {
         gfx_font_print(TEXT_X_0, TEXT_YN(8), gameFontNormal, "** PAUSED **");
         snprintf (s, sizeof (s), "Sometris v%i.%i.%i", VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION);
         gfx_font_print(TEXT_X_0, TEXT_Y(11), gameFontSmall, s);
-        gfx_font_print(TEXT_X_0, TEXT_Y(12), gameFontSmall, "Copyright (C) Peter");
-        gfx_font_print(TEXT_X_0, TEXT_Y(13), gameFontSmall, "Ivanov, 2013-2016");
-        gfx_font_print(TEXT_X_0, TEXT_Y(14), gameFontSmall, "ivanovp@gmail.com");
-        gfx_font_print(TEXT_X_0, TEXT_Y(15), gameFontSmall, "http://dev.ivanov.eu");
+        gfx_font_print(TEXT_X_0, TEXT_Y(12), gameFontSmall, "Copyright (C)");
+        gfx_font_print(TEXT_X_0, TEXT_Y(13), gameFontSmall, "Peter Ivanov,");
+        gfx_font_print(TEXT_X_0, TEXT_Y(14), gameFontSmall, "2013-2016");
+        gfx_font_print(TEXT_X_0, TEXT_Y(15), gameFontSmall, "ivanovp@gmail.com");
+        gfx_font_print(TEXT_X_0, TEXT_Y(16), gameFontSmall, "http://dev.ivanov.eu");
 //        gfx_font_print(TEXT_X_0, TEXT_Y(14), gameFontSmall, "Licence: GPLv2");
 //        gfx_font_print(TEXT_X_0, TEXT_Y(15), gameFontSmall, "ABSOLUTELY");
 //        gfx_font_print(TEXT_X_0, TEXT_Y(16), gameFontSmall, "NO WARRANTY!");
