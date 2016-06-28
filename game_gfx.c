@@ -21,7 +21,7 @@
 #include "game_gfx.h"
 
 /* Block sprites */
-SDL_Surface * blocks[MAX_BLOCK_TYPES];
+SDL_Surface * blocks[MAX_BLOCK_TYPES + 1];
 
 SDL_Surface * loadImage(const char* filename)
 {
@@ -69,7 +69,7 @@ void loadBlocks()
   int i;
   char filename[64];
 
-  for ( i = 0; i < MAX_BLOCK_TYPES; i++)
+  for ( i = 0; i <= MAX_BLOCK_TYPES; i++)
   {
     snprintf(filename, sizeof(filename), BLOCK_PNG, i);
     blocks[i] = loadImage(filename);
@@ -80,7 +80,7 @@ void freeBlocks()
 {
   int i;
 
-  for ( i = 0; i < MAX_BLOCK_TYPES; i++)
+  for ( i = 0; i <= MAX_BLOCK_TYPES; i++)
   {
     printf("Releasing block %i\r\n", i);
     SDL_FreeSurface(blocks[i]);
