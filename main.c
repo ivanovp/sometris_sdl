@@ -14,6 +14,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <pwd.h>
 
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
@@ -24,9 +28,9 @@
 #include "game_common.h"
 #include "game_gfx.h"
 
-//#define BLOCKS_SPRITE_FILENAME  "stblocks.spt"
-#define CONFIG_FILENAME         "stconfig.bin"
-#define GAME_FILENAME           "stgame.bin"    /**< Saved game */
+#define CONFIG_DIR              "/.sometris"
+#define CONFIG_FILENAME         CONFIG_DIR "/stconfig.bin"
+#define GAME_FILENAME           CONFIG_DIR "/stgame.bin"    /**< Saved game */
 //#define PLAYLIST_FILENAME       "playlist.txt"  /**< Path of your music collection (MOD/S3M/XM) */
 //#define PLAYLIST_MEM_LIMIT      (32768)         /**< 32 KiB */
 //#define DEFAULT_MUSIC_FILENAME  "music.mod"
@@ -80,6 +84,8 @@ const char* info[] =
     "Now you can select number of block types with up/down.",
     "Press 'ENTER' to start game."
 };
+
+const char *homeDir;
 
 /* Game related */
 uint32_t     gameTimer = 0;
@@ -150,6 +156,7 @@ void loadConfig (void)
     uint16_t i, j;
     FILE* configFile;
     config_t configTemp;
+    uint8_t path[256];
 
     drawInfoScreen ("Loading configuration...");
 
@@ -167,7 +174,10 @@ void loadConfig (void)
     {
         config.player_names[i][0] = 0;
     }
-    configFile = fopen (CONFIG_FILENAME, "rb");
+    strncpy(path, homeDir, sizeof(path));
+    strncat(path, CONFIG_FILENAME, sizeof(path));
+    printf("%s: %s\n", __FUNCTION__, path);
+    configFile = fopen (path, "rb");
     if (configFile)
     {
         size_t size;
@@ -188,11 +198,15 @@ bool_t saveConfig (void)
 {
     bool_t ok = FALSE;
     FILE* configFile;
+    uint8_t path[256];
 
     drawInfoScreen ("Saving configuration...");
 
     strncpy (config.music_file_path, musicFilePath, sizeof (config.music_file_path));
-    configFile = fopen (CONFIG_FILENAME, "wb");
+    strncpy(path, homeDir, sizeof(path));
+    strncat(path, CONFIG_FILENAME, sizeof(path));
+    printf("%s: %s\n", __FUNCTION__, path);
+    configFile = fopen (path, "wb");
     if (configFile)
     {
         size_t size;
@@ -202,6 +216,11 @@ bool_t saveConfig (void)
             ok = TRUE;
         }
         fclose (configFile);
+    }
+    else
+    {
+      drawInfoScreen("Cannot save configuration!");
+      SDL_Delay(500);
     }
 
     return ok;
@@ -215,8 +234,12 @@ bool_t canLoadGame (void)
     FILE* gameFile;
     bool_t canLoad = FALSE;
     uint8_t version;
+    uint8_t path[256];
 
-    gameFile = fopen (GAME_FILENAME, "rb");
+    strncpy(path, homeDir, sizeof(path));
+    strncat(path, GAME_FILENAME, sizeof(path));
+    printf("%s: %s\n", __FUNCTION__, path);
+    gameFile = fopen (path, "rb");
     if (gameFile)
     {
         size_t size;
@@ -238,10 +261,14 @@ void loadGame (void)
 {
     FILE* gameFile;
     game_t gameTemp;
+    uint8_t path[256];
 
     drawInfoScreen ("Loading game...");
 
-    gameFile = fopen (GAME_FILENAME, "rb");
+    strncpy(path, homeDir, sizeof(path));
+    strncat(path, GAME_FILENAME, sizeof(path));
+    printf("%s: %s\n", __FUNCTION__, path);
+    gameFile = fopen (path, "rb");
     if (gameFile)
     {
         size_t size;
@@ -262,10 +289,14 @@ bool_t saveGame (void)
 {
     bool_t ok = FALSE;
     FILE* gameFile;
+    uint8_t path[256];
 
     drawInfoScreen ("Saving game...");
 
-    gameFile = fopen (GAME_FILENAME, "wb");
+    strncpy(path, homeDir, sizeof(path));
+    strncat(path, GAME_FILENAME, sizeof(path));
+    printf("%s: %s\n", __FUNCTION__, path);
+    gameFile = fopen (path, "wb");
     if (gameFile)
     {
         size_t size;
@@ -750,8 +781,19 @@ void donePlaylist (void)
 bool_t init (void)
 {
     int i;
+    uint8_t path[256];
 
     srand(time(NULL));
+
+    homeDir = getenv ("HOME");
+    if (homeDir == NULL)
+    {
+      homeDir = getpwuid (getuid ())->pw_dir;
+    }
+    strncpy(path, homeDir, sizeof(path));
+    strncat(path, CONFIG_DIR, sizeof(path));
+    printf("%s mkdir: %s\r\n", __FUNCTION__, path);
+    mkdir(path, 0755);
 
     SDL_Init(SDL_INIT_EVERYTHING);
 
