@@ -1,6 +1,7 @@
 # Define the applications properties here:
 
 APP_NAME = sometris
+DATA_DIR = /usr/share/$(APP_NAME)
 
 # Define the compiler settings here:
 
@@ -13,11 +14,11 @@ SOURCE    = .
 INCLUDE   = -I.
 
 W_OPTS    = -Wall -Wextra -finline-functions -fomit-frame-pointer -fno-builtin -fno-exceptions
-CPP_OPTS  = -O0 $(INCLUDE) $(W_OPTS) -D_DEBUG -c -ggdb3
-CC_OPTS   = -O0 $(INCLUDE) $(W_OPTS) -D_DEBUG -c -ggdb3
+CPP_OPTS  = -O0 $(INCLUDE) $(W_OPTS) -D_DEBUG -DDATA_DIR=\"$(DATA_DIR)\" -c -ggdb3
+CC_OPTS   = -O0 $(INCLUDE) $(W_OPTS) -D_DEBUG -DDATA_DIR=\"$(DATA_DIR)\" -c -ggdb3
 CC_OPTS_A = $(CC_OPTS) -D_ASSEMBLER_
 
-LIBS      = -lc -lm -lSDL -lSDL_ttf -lSDL_gfx -lSDL_image
+LIBS      = -lc -lm -lSDL -lSDL_gfx -lSDL_image
 
 LD_OPTS   = $(LIBS) -o $(APP_NAME)
 
@@ -73,34 +74,17 @@ INSTALL_DIR = sometris_v121
 INSTALL_FILES = README COPYING $(APP_NAME) $(TGA) *.mod gfx/font*.tga
 
 .PHONY: install
-install: $(APP_NAME).app $(TGA)
-	@echo Installing to $(INSTALL_DIR)...
-	@-mkdir -p $(INSTALL_DIR)
-	@rm -vf $(INSTALL_DIR)/blocks.spt
-	@cp -vf $(INSTALL_FILES) $(INSTALL_DIR)
+install: $(APP_NAME)
+	install -D -m755 sometris /usr/bin
+	install -m755 -d /usr/share/sometris/gfx
+	install -m644 gfx/bg.png /usr/share/sometris/gfx
+	install -m644 gfx/block?.png /usr/share/sometris/gfx
 
 .PHONY: tags
 tags:
 	ctags -R . 
 
 DIST_NAME = sometris_v121
-# Long filenames are not handled properly by Dingoo A320!
-DIR = sometris
-
-.PHONY: dist predist postdist
-dist:	predist $(DIST_NAME).tar.gz $(DIST_NAME).zip postdist
-
-predist: $(APP_NAME).app $(TGA)
-	mkdir $(DIR)/
-	cp -r $(INSTALL_FILES) $(DIR)/
-
-postdist:
-	rm -rf $(DIR)/
-
-$(DIST_NAME).tar.gz: $(DIR)/
-
-$(DIST_NAME).zip: $(DIR)/
-
 %.tar.gz:
 	tar -cvzf $@ $^
 

@@ -42,7 +42,10 @@
 #define TEXT_XN(x)      (TEXT_X_0 + FONT_NORMAL_SIZE_X_PX * (x))
 #define TEXT_YN(y)      (TEXT_Y_0 + (FONT_NORMAL_SIZE_Y_PX) * (y))
 
-#define GFX_DIR                 "gfx/"
+#ifndef DATA_DIR
+#define DATA_DIR                "."
+#endif
+#define GFX_DIR                 DATA_DIR "/gfx/"
 #define BACKGROUND_PNG          GFX_DIR "bg.png"
 #define BLOCK_PNG               GFX_DIR "block%i.png"
 
