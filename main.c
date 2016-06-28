@@ -139,7 +139,6 @@ config_t config =
 SDL_Surface* background = NULL;
 SDL_Surface* screen = NULL;
 bool_t textInputIsStarted = FALSE;
-bool_t textInputIsFinished = FALSE;
 char * text = NULL;
 uint32_t textLength = 0;
 
@@ -342,10 +341,8 @@ void insertRecord (uint8_t aBlockType, uint8_t aScore)
 void startTextInput(char * atext, uint32_t length)
 {
   textInputIsStarted = TRUE;
-  textInputIsFinished = FALSE;
   text = atext;
   textLength = length;
-  text[0] = 0;
 }
 
 void stopTextInput(void)
@@ -1027,12 +1024,6 @@ bool_t handleMainStateMachine (void)
                 /* Restart game */
                 replay = TRUE;
             }
-//            if (control_check (CONTROL_BUTTON_X).pressed
-//                    && control_check(CONTROL_BUTTON_X).changed)
-//            {
-//                /* Quit */
-//                gameRunning = FALSE;
-//            }
             drawGameScreen ();
             break;
         case STATE_select_name:
@@ -1195,6 +1186,7 @@ void key_task()
                     text[len] = event.key.keysym.sym;
                     if (event.key.keysym.mod & (KMOD_RSHIFT | KMOD_LSHIFT) )
                     {
+                      /* Make upper case */
                       text[len] &= 0xDF;
                     }
                     text[len + 1] = 0;
@@ -1203,11 +1195,6 @@ void key_task()
               if (event.key.keysym.sym == SDLK_BACKSPACE && len > 0)
               {
                 text[len - 1] = 0;
-              }
-              if (event.key.keysym.sym == SDLK_RETURN
-                   || event.key.keysym.sym == SDLK_KP_ENTER)
-              {
-                textInputIsFinished = TRUE;
               }
             }
 
@@ -1271,22 +1258,6 @@ void key_task()
             /* Quit the program */
             gameRunning = FALSE;
         }
-//        else if (event.type == SDL_TEXTINPUT)
-//        {
-//          /* Add new text onto the end of our text */
-//          strcat(text, event.text.text);
-//        }
-//        else if (event.type == SDL_TEXTEDITING)
-//        {
-//          /*
-//            Update the composition text.
-//            Update the cursor position.
-//            Update the selection length (if any).
-//          */
-//          composition = event.edit.text;
-//          cursor = event.edit.start;
-//          selection_len = event.edit.length;
-//        }
     }
 
     //  collectRandomNumbers ();
