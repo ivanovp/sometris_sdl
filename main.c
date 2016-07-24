@@ -1332,6 +1332,7 @@ replay:
         {
             goto replay; /* Shh! Bad thing! */
         }
+        usleep( 10e3 );
     }
 }
 
