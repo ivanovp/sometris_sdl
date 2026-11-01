@@ -42,10 +42,11 @@ SDL_Surface * loadImage(const char* filename)
 
       if (optimizedImage != NULL)
       {
-          // Map the color key
-          Uint32 colorkey = SDL_MapRGB (optimizedImage->format, 0xFF, 0, 0xFF);
-
-          // Set all pixels of color R 0xFF, G 0, B 0xFF to be transparent
+          // Every block sprite uses its top-left magenta pixel as the
+          // transparent background.  Use the converted pixel verbatim:
+          // SDL_MapRGB can omit unused high bits retained by SDL 1.2's PNG
+          // conversion, producing a color key which does not actually match.
+          Uint32 colorkey = *((Uint32*) optimizedImage->pixels);
           SDL_SetColorKey (optimizedImage, SDL_SRCCOLORKEY, colorkey);
 
           printf("Done\n");
