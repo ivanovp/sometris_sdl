@@ -4,7 +4,7 @@
  * @author      Copyright (C) Peter Ivanov, 2011, 2012, 2013, 2014
  *
  * Created      2011-01-19 11:48:53
- * Last modify: 2016-04-14 14:54:30 ivanovp {Time-stamp}
+ * Last modify: 2026-11-01 20:35:53 ivanovp {Time-stamp}
  * Licence:     GPL
  */
 
@@ -17,7 +17,7 @@
 
 #define VERSION_MAJOR    1
 #define VERSION_MINOR    2
-#define VERSION_REVISION 1
+#define VERSION_REVISION 2
 
 #define MAX(x, y) (x > y ? x : y)
 #define MIN(x, y) (x < y ? x : y)
